@@ -2,8 +2,10 @@
    You can receive it with:
       rtl_433 -X 'n=name,m=OOK_MC_ZEROBIT,s=676,l=0,r=1776,invert,reflect,preamble={32}0x55555555,bits>=72'
 
+      to data added prefix(4b) nonce as counter, it is not sent, it is "assumed" on both sides, then data with non-ce encrypted
+      encrypted non-ce 4b is not sent
+      receiver must assume which counter is now by calculating time offset since device registration and beaconing period      
 
-    TODO: Memory content is kept in Halt or Active halt mode. Keep counter.
 */
 #include "stm8s.h"
 #include <stdint.h>
@@ -21,6 +23,7 @@ volatile uint8_t bit_state = 0;
     Bit is 0 - set to 4
     Wait for 0
 */
+uint32_t tx_counter = 0;
 
 static inline void _delay_cycl( unsigned short __ticks )
 {
@@ -114,15 +117,23 @@ static void send_byte(uint8_t byte) {
 static void rf_send(uint8_t* data_pointer, uint8_t number_of_bytes) {
     uint8_t tmp = 0;
     uint8_t crcnow = calc_crc8(data_pointer, number_of_bytes);
+    uint8_t *tx_counter_prepared = (uint8_t*)&tx_counter;
+    uint8_t raw[32];
+    uint32_t key[4] = { 0x0102aabb, 0x0203aabb, 0x0304aabb, 0x0506aabb};
 
     for (tmp = 0; tmp < PREAMBLE_BYTES; tmp++)
         send_byte(0x55);
 
-    for (tmp = 0; tmp < number_of_bytes; tmp++)
-        send_byte(data_pointer[tmp]);
-    send_byte(crcnow);
+    for (tmp=0;tmp<4;tmp++)
+        raw[tmp] = tx_counter_prepared[tmp];
+    for (tmp=0;tmp<number_of_bytes;tmp++)
+        raw[tmp+4] = data_pointer[tmp];
 
-    _delay_ms(10000);
+    xxtea((uint32_t*)&raw[4], number_of_bytes/4, key);
+
+    for (tmp = 0; tmp < number_of_bytes+4; tmp++)
+        send_byte(raw[tmp]);
+    send_byte(crcnow);
 }
 
 int main() {
@@ -156,12 +167,24 @@ int main() {
     AWU_APR = 62;
     AWU_CSR1 = 0x10;
 
+    /* Setup REGAH in CLK_ICKR? For lower power in Active Halt */
+
     enableInterrupts();
+    /* TODO: Add initial startup TX several times with short pause? so we can sync */
+    /*
+    for (d=0;d<10;d++) {
+        rf_send((uint8_t*)&tx, 8);
+        _delay_ms(1000);
+    }
+    */
+
     do {
         // PB_ODR ^= 0x20; // For test only
         rf_send((uint8_t*)&tx, 8);
+        tx_counter++;
         // keep halting on AWU several times to sleep longer?
-        halt();
+        for(d=0;d<2;d++)
+            halt();
     } while (1);
 }
 
