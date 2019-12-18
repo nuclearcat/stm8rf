@@ -1,6 +1,9 @@
 /* At current stage it is just PoC for TX'ing on demo STM8S003 + 433Mhz module connected to PC4)
    You can receive it with:
-      rtl_433 -X 'n=name,m=OOK_MC_ZEROBIT,s=676,l=0,r=1776,invert,reflect,preamble={32}0x55555555'
+      rtl_433 -X 'n=name,m=OOK_MC_ZEROBIT,s=676,l=0,r=1776,invert,reflect,preamble={32}0x55555555,bits>=72'
+
+
+    TODO: Memory content is kept in Halt or Active halt mode. Keep counter.
 */
 #include "stm8s.h"
 #include <stdint.h>
@@ -108,7 +111,7 @@ static void send_byte(uint8_t byte) {
 
 }
 
-static void manchester_send(uint8_t* data_pointer, uint8_t number_of_bytes) {
+static void rf_send(uint8_t* data_pointer, uint8_t number_of_bytes) {
     uint8_t tmp = 0;
     uint8_t crcnow = calc_crc8(data_pointer, number_of_bytes);
 
@@ -125,10 +128,11 @@ static void manchester_send(uint8_t* data_pointer, uint8_t number_of_bytes) {
 int main() {
     int d = 0;
     uint8_t crcnow = 0;
-    /* This is just demo/test data */
-    const uint8_t tx[8] = { 0x01, 0x02, 0x03, 0x04, 0xa1, 0xa2, 0xa3, 0xa4 };
+    /* TX data should be N*4 bytes */
+    uint8_t tx[8] = { 0x01, 0x02, 0x03, 0x04, 0xa1, 0xa2, 0xa3, 0xa4 };
     CLK_CKDIVR = 0;
     CLK_PCKENR1 = 0xFF; // Enable peripherals
+
 
     // Timer setup
     TIM2_PSCR = 5; // (2^4)=16 prescaler (was 6)
@@ -137,7 +141,6 @@ int main() {
 
     TIM2_IER |= TIM_IER_UIE; // CC1IE
     TIM2_CR1 |= TIM_CR1_CEN;
-
 
     // Radio on PC4
     PC_DDR = 0x10;
@@ -148,9 +151,17 @@ int main() {
     PB_CR1 = 0x20;
 
     PB_ODR |= 0x20;
+
+    AWU_TBR = 12+2; // 1 sec
+    AWU_APR = 62;
+    AWU_CSR1 = 0x10;
+
     enableInterrupts();
     do {
-        manchester_send((uint8_t*)&tx, 8);
+        // PB_ODR ^= 0x20; // For test only
+        rf_send((uint8_t*)&tx, 8);
+        // keep halting on AWU several times to sleep longer?
+        halt();
     } while (1);
 }
 
@@ -192,4 +203,8 @@ void TIM2_CC_Handler(void) __interrupt(13) {
         bit_state = 0;
         break;
     }
+}
+
+void AWU_Handler(void) __interrupt(1) {
+    AWU_CSR1 &= ~(1<<5); // clear AWU_CSR1_AWUF AWUF
 }
