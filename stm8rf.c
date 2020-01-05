@@ -6,6 +6,9 @@
       encrypted non-ce 4b is not sent
       receiver must assume which counter is now by calculating time offset since device registration and beaconing period      
 
+    TODO: Use fixed key only for power-on beaconing (encrypting and sending nonce + session key)
+          Power on beaconing might increase eeprom counter by 1 and generate "RAM-only" session key deriving it from pseudo-seed+eeprom counter
+
 */
 #include "stm8s.h"
 #include <stdint.h>
@@ -116,7 +119,7 @@ static void send_byte(uint8_t byte) {
 
 static void rf_send(uint8_t* data_pointer, uint8_t number_of_bytes) {
     uint8_t tmp = 0;
-    uint8_t crcnow = calc_crc8(data_pointer, number_of_bytes);
+    uint8_t crcnow;
     uint8_t *tx_counter_prepared = (uint8_t*)&tx_counter;
     uint8_t raw[32];
     uint32_t key[4] = { 0x0102aabb, 0x0203aabb, 0x0304aabb, 0x0506aabb};
@@ -129,10 +132,12 @@ static void rf_send(uint8_t* data_pointer, uint8_t number_of_bytes) {
     for (tmp=0;tmp<number_of_bytes;tmp++)
         raw[tmp+4] = data_pointer[tmp];
 
-    xxtea((uint32_t*)&raw[4], number_of_bytes/4, key);
+    xxtea((uint32_t*)raw, number_of_bytes/4+1, key);
+    crcnow = calc_crc8(&raw[4], number_of_bytes);
 
-    for (tmp = 0; tmp < number_of_bytes+4; tmp++)
-        send_byte(raw[tmp]);
+    for (tmp = 0; tmp < number_of_bytes; tmp++)
+        send_byte(raw[tmp+4]);
+
     send_byte(crcnow);
 }
 
@@ -183,8 +188,9 @@ int main() {
         rf_send((uint8_t*)&tx, 8);
         tx_counter++;
         // keep halting on AWU several times to sleep longer?
-        for(d=0;d<2;d++)
-            halt();
+        //for(d=0;d<2;d++)
+        //    halt();
+        _delay_ms(5000);
     } while (1);
 }
 
