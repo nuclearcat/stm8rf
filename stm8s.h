@@ -1,3 +1,7 @@
+#define _MEM_(mem_addr)      (*(volatile uint8_t *)(mem_addr))
+#define _SFR_(mem_addr)      (*(volatile uint8_t *)((mem_addr)))
+#define _SFR16_(mem_addr)    (*(volatile uint16_t *)((mem_addr)))
+
 /* GPIO */
 #define PA_ODR *(unsigned char*)0x5000
 #define PA_IDR *(unsigned char*)0x5001
@@ -47,6 +51,16 @@
 #define FLASH_PUKR	*(unsigned char*)0x5062
 // unused				 0x5063
 #define FLASH_DUKR	*(unsigned char*)0x5064
+
+#define FLASH_PUKR_KEY1         0x56
+#define FLASH_PUKR_KEY2         0xAE
+#define FLASH_DUKR_KEY1         FLASH_PUKR_KEY2
+#define FLASH_DUKR_KEY2         FLASH_PUKR_KEY1
+#define FLASH_IAPSR_DUL         3
+#define FLASH_IAPSR_EOP         2
+#define FLASH_IAPSR_PUL         1
+#define EEPROM_START_ADDR       0x4000
+#define EEPROM_END_ADDR         0x407F
 
 /* ITC */
 #define EXTI_CR1	*(unsigned char*)0x50A0
