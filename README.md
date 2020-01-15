@@ -31,7 +31,7 @@ Counter is increasing incrementally by timer, so clock-drift compensation should
 First 4 bytes, (encrypted non-ce 4b) is not sent over RF.
 
 TODO: Add some way to send out-of-band data, on critical situations and etc.
-
+TODO: CTR encryption mode seems more suitable
 
 Also remember:
 ECC recommendation 70-03, Frequency Bands For Non-Specific Short Range Devices in Europe, ERP +10dBm, <10% duty cycle

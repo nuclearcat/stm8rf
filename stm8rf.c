@@ -266,6 +266,8 @@ int main() {
     } while (1);
 }
 
+
+// Manchester timing implemented here
 void TIM2_CC_Handler(void) __interrupt(13) {
     TIM2_SR1 &= ~0x1; //reset interrupt
 
@@ -274,7 +276,9 @@ void TIM2_CC_Handler(void) __interrupt(13) {
         PB_ODR |= 0x20;
         return;
     }
+
     switch (bit_state) {
+
     // OFF bit (10)
     case 4:
         PC_ODR |= 0x10; // 1
